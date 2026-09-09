@@ -105,6 +105,17 @@ Currently supported domains:
   cannot resolve them: its lookups exclude retired rows, so re-importing one fails on the name/uuid
   constraints), and datatype config is not exported (Initializer has no column for it); requires
   the cohort module (3.5+)
+* System tasks (name, title, description, priority, default assignee role, rationale) — the
+  default assignee is written as the provider role's uuid and returned as a cross-domain
+  dependency, but provider roles themselves are not yet exported: Initializer's `providerroles`
+  domain still targets the providermanagement module's provider roles, while core 2.8+ has its own
+  (see [Initializer #303](https://github.com/mekomsolutions/openmrs-module-initializer/issues/303)),
+  so until that lands Initializer resolves the assignee column through the providermanagement
+  module only: when that module is absent the assignee is dropped with a warning, and when it is
+  present a providermanagement provider role with the same uuid must already exist on the importing
+  server or the row fails to import (core's own `provider_role` table is not consulted); a task
+  whose assignee role no longer exists on the exporting server is exported without the assignee
+  column, with a warning; requires the tasks module (1.0+)
 
 Domains contributed by other modules (supportable, but depend on the module being present;
 not yet covered):
@@ -114,7 +125,6 @@ not yet covered):
 * Appointment scheduling (specialities, service definitions, service types)
 * Queues
 * Data filter mappings
-* System Tasks
 
 Non-exportable Initializer domains (Liquibase, JSON key-values, OCL, Dispositions) are
 out of scope.

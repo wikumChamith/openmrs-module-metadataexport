@@ -64,6 +64,7 @@
         <metadatasharingVersion>1.2.2</metadatasharingVersion>
         <addresshierarchyVersion>2.17.0</addresshierarchyVersion>
 		<cohortModuleVersion>3.5.0</cohortModuleVersion>
+		<tasksVersion>1.0.0</tasksVersion>
     </properties>
 
 	<build>
@@ -198,6 +199,13 @@
 			<groupId>org.openmrs.module</groupId>
 			<artifactId>cohort-api</artifactId>
 			<version>${cohortModuleVersion}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.openmrs.module</groupId>
+			<artifactId>tasks-api</artifactId>
+			<version>${tasksVersion}</version>
 			<scope>provided</scope>
 		</dependency>
 	</dependencies>

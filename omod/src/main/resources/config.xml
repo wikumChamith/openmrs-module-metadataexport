@@ -42,6 +42,7 @@
 		<aware_of_module>org.openmrs.module.metadatasharing</aware_of_module>
 		<aware_of_module>org.openmrs.module.addresshierarchy</aware_of_module>
 		<aware_of_module>org.openmrs.module.cohort</aware_of_module>
+		<aware_of_module>org.openmrs.module.tasks</aware_of_module>
 	</aware_of_modules>
 	
 	
