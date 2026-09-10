@@ -157,43 +157,58 @@ definitions are stored in the database; every build of a package gets an increme
 status (`QUEUED` → `RUNNING` → `COMPLETED`/`FAILED`), and a downloadable zip containing the
 `configuration/` tree plus a `package.json` manifest recording exactly what was exported.
 
-Builds run asynchronously on a daemon thread; trigger, then poll. Endpoints (all under
-`/openmrs/ws/rest/v1/metadataexport`, plain Spring controllers — the webservices.rest module is
-not required, but its authentication filter covers these URLs when it is installed):
+Builds run asynchronously on a daemon thread; trigger, then poll. Packages and builds are
+[REST web services](https://wiki.openmrs.org/x/xoAaAQ) resources under the module namespace
+`/openmrs/ws/rest/v1/metadataexport`, so they follow every REST module convention: `?v=ref|default|full`
+representations, `?startIndex=&limit=` paging with `results`/`links`/`totalCount` (`totalCount=true`
+to ask for it), `includeAll=true` to include retired items, the standard `{"error": {...}}` body
+with `fieldErrors`/`globalErrors` on validation failures, and the module's authentication filter
+(basic auth or a session). The two things the framework cannot express - a fixed list of strings
+and a binary download - are plain Spring controllers at the same base path.
 
-| Method | Path                         | Action                                     |
-|--------|------------------------------|--------------------------------------------|
-| GET    | `/domains`                   | list the registered, exportable domains    |
-| GET    | `/packages?includeRetired=`  | list packages                              |
-| POST   | `/packages`                  | create a package (201)                     |
-| GET    | `/packages/{uuid}`           | fetch one, incl. its latest build          |
-| PUT    | `/packages/{uuid}`           | update name/description/entries            |
-| DELETE | `/packages/{uuid}?reason=`   | retire (204)                               |
-| POST   | `/packages/{uuid}/builds`    | trigger a build (202; 409 if one is active)|
-| GET    | `/packages/{uuid}/builds`    | build history, newest first                |
-| GET    | `/builds/{uuid}`             | poll status, incl. manifest when done      |
-| GET    | `/builds/{uuid}/download`    | the zip (409 unless COMPLETED, 410 if gone)|
+| Method | Path                            | Action                                                     |
+|--------|---------------------------------|------------------------------------------------------------|
+| GET    | `/domains`                      | list the registered, exportable domains (not a resource)   |
+| GET    | `/packages`                     | list packages by name, paged; `includeAll=true` for retired|
+| POST   | `/packages`                     | create a package (201)                                     |
+| GET    | `/packages/{uuid}`              | fetch one, incl. `latestBuild`                             |
+| POST   | `/packages/{uuid}`              | update name/description/entries (REST module uses POST)    |
+| DELETE | `/packages/{uuid}?reason=`      | retire (204); `?purge=true` is refused (400)               |
+| POST   | `/builds` `{"package": uuid}`   | trigger a build (201 with the QUEUED build; 409 if retired or a build is active) |
+| GET    | `/builds?package={uuid}`        | build history of a package, paged, newest first (404 if unknown) |
+| GET    | `/builds/{uuid}`                | poll status; `?v=full` adds the parsed `manifest`; updates are refused (400) |
+| GET    | `/builds/{uuid}/download`       | the zip (409 unless COMPLETED, 410 if gone; not a resource)|
+
+A package body is `{"name", "description", "entries": [{"domain", "itemUuids": [...]}]}`; `entries`
+is required on create because an explicit `[]` means "every registered domain", so a missing list is
+rejected rather than silently widening the export. Updates are partial in the REST module's usual
+way: a property left out of the body keeps its current value. A build's default
+representation carries `package` (ref), `version`, `status`, the three dates, `errorMessage` and,
+once COMPLETED, an absolute `downloadUrl`.
 
 Example flow:
 
 ```bash
+BASE=http://localhost:8080/openmrs/ws/rest/v1/metadataexport
+
 # define a package scoped to two locations
 curl -u admin:pw -H 'Content-Type: application/json' -d '{
   "name": "Site A locations",
   "description": "Everything Site A needs",
   "entries": [ { "domain": "LOCATIONS", "itemUuids": ["<uuid-1>", "<uuid-2>"] } ]
-}' http://localhost:8080/openmrs/ws/rest/v1/metadataexport/packages
+}' $BASE/packages
 
 # trigger a build, poll until COMPLETED, then download
-curl -u admin:pw -X POST .../packages/<pkg-uuid>/builds
-curl -u admin:pw .../builds/<build-uuid>
-curl -u admin:pw -OJ .../builds/<build-uuid>/download
+curl -u admin:pw -H 'Content-Type: application/json' -d '{"package":"<pkg-uuid>"}' $BASE/builds
+curl -u admin:pw $BASE/builds/<build-uuid>
+curl -u admin:pw -OJ $BASE/builds/<build-uuid>/download
 ```
 
-Reads require the `Get Metadata Export Packages` privilege; creating, updating, retiring,
-triggering and downloading require `Manage Metadata Export Packages`. The curl examples use
-basic auth, which is provided by webservices.rest's filter — without that module, authenticate
-with a session instead.
+Privileges are enforced on the service (`@Authorized`), so they apply to every entry point that
+reaches it; `/domains` reads the exporter registry directly and checks the Get privilege itself.
+Reads need `Get Metadata Export Packages`; creating, updating, retiring, triggering and downloading
+need `Manage Metadata Export Packages`. Note the REST module's own convention that list and search
+responses are `ref` representations unless the request carries `?v=default` or `?v=full`.
 
 If the server restarts mid-build, the activator marks any stranded QUEUED/RUNNING builds as
 FAILED on startup so they never block future builds of their package.
@@ -206,7 +221,8 @@ admin-only API.
 
 Requirements
 ------------
-The Initializer module must be installed (declared in `config.xml` `require_modules`); this module
+The Initializer and REST Web Services modules must be installed (both declared in `config.xml`
+`require_modules`); this module
 reuses its `Domain` and CSV header definitions.
 
 Adding a new domain

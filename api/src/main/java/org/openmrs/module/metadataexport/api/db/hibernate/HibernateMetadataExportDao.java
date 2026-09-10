@@ -20,9 +20,7 @@ import org.openmrs.module.metadataexport.api.model.ExportStatus;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -55,23 +53,41 @@ public class HibernateMetadataExportDao implements MetadataExportDao {
 	
 	@Override
 	public List<ExportPackage> getAllPackages(boolean includeRetired) {
+		return packagesQuery(includeRetired).getResultList();
+	}
+	
+	@Override
+	public List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit) {
+		return window(packagesQuery(includeRetired), startIndex, limit).getResultList();
+	}
+	
+	@Override
+	public long getCountOfPackages(boolean includeRetired) {
+		Session session = sessionFactory.getCurrentSession();
+		CriteriaBuilder cb = session.getCriteriaBuilder();
+		CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+		Root<ExportPackage> root = cq.from(ExportPackage.class);
+		cq.select(cb.count(root));
+		if (!includeRetired) {
+			cq.where(cb.isFalse(root.get("retired")));
+		}
+		return session.createQuery(cq).getSingleResult();
+	}
+	
+	/**
+	 * Ordered by name then id: the name is unique among unretired packages and the id breaks ties with
+	 * retired predecessors of the same name, so consecutive pages never overlap or skip rows.
+	 */
+	private TypedQuery<ExportPackage> packagesQuery(boolean includeRetired) {
 		Session session = sessionFactory.getCurrentSession();
 		CriteriaBuilder cb = session.getCriteriaBuilder();
 		CriteriaQuery<ExportPackage> cq = cb.createQuery(ExportPackage.class);
 		Root<ExportPackage> root = cq.from(ExportPackage.class);
-		
-		List<Predicate> predicates = new ArrayList<>();
-		
 		if (!includeRetired) {
-			predicates.add(cb.isFalse(root.get("retired")));
+			cq.where(cb.isFalse(root.get("retired")));
 		}
-		
-		if (!predicates.isEmpty()) {
-			cq.where(predicates.toArray(new Predicate[0]));
-		}
-		
-		TypedQuery<ExportPackage> query = session.createQuery(cq);
-		return query.getResultList();
+		cq.orderBy(cb.asc(root.get("name")), cb.asc(root.get("packageId")));
+		return session.createQuery(cq);
 	}
 	
 	@Override
@@ -90,21 +106,33 @@ public class HibernateMetadataExportDao implements MetadataExportDao {
 	
 	@Override
 	public List<ExportBuild> getBuilds(ExportPackage exportPackage) {
-		TypedQuery<ExportBuild> query = sessionFactory.getCurrentSession().createQuery(
-		    "from ExportBuild build where build.exportPackage = :exportPackage order by build.version desc",
-		    ExportBuild.class);
+		return buildsQuery(exportPackage).getResultList();
+	}
+	
+	@Override
+	public List<ExportBuild> getBuilds(ExportPackage exportPackage, int startIndex, int limit) {
+		return window(buildsQuery(exportPackage), startIndex, limit).getResultList();
+	}
+	
+	@Override
+	public long getCountOfBuilds(ExportPackage exportPackage) {
+		TypedQuery<Long> query = sessionFactory.getCurrentSession().createQuery(
+		    "select count(build) from ExportBuild build where build.exportPackage = :exportPackage", Long.class);
 		query.setParameter("exportPackage", exportPackage);
-		return query.getResultList();
+		return query.getSingleResult();
 	}
 	
 	@Override
 	public ExportBuild getLatestBuild(ExportPackage exportPackage) {
+		return window(buildsQuery(exportPackage), 0, 1).getResultStream().findFirst().orElse(null);
+	}
+	
+	private TypedQuery<ExportBuild> buildsQuery(ExportPackage exportPackage) {
 		TypedQuery<ExportBuild> query = sessionFactory.getCurrentSession().createQuery(
 		    "from ExportBuild build where build.exportPackage = :exportPackage order by build.version desc",
 		    ExportBuild.class);
 		query.setParameter("exportPackage", exportPackage);
-		query.setMaxResults(1);
-		return query.getResultStream().findFirst().orElse(null);
+		return query;
 	}
 	
 	@Override
@@ -113,5 +141,20 @@ public class HibernateMetadataExportDao implements MetadataExportDao {
 		        .createQuery("from ExportBuild build where build.exportStatus in (:statuses)", ExportBuild.class);
 		query.setParameter("statuses", Arrays.asList(ExportStatus.QUEUED, ExportStatus.RUNNING));
 		return query.getResultList();
+	}
+	
+	/**
+	 * Hibernate rejects a negative offset itself, but treats a zero limit as "no limit", so guard both.
+	 */
+	private static <T> TypedQuery<T> window(TypedQuery<T> query, int startIndex, int limit) {
+		if (startIndex < 0) {
+			throw new IllegalArgumentException("startIndex must be 0 or greater, got " + startIndex);
+		}
+		if (limit < 1) {
+			throw new IllegalArgumentException("limit must be 1 or greater, got " + limit);
+		}
+		query.setFirstResult(startIndex);
+		query.setMaxResults(limit);
+		return query;
 	}
 }

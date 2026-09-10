@@ -68,6 +68,18 @@ public class MetadataExportServiceImpl extends BaseOpenmrsService implements Met
 	}
 	
 	@Override
+	@Transactional(readOnly = true)
+	public List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit) {
+		return metadataExportDao.getPackages(includeRetired, startIndex, limit);
+	}
+	
+	@Override
+	@Transactional(readOnly = true)
+	public long getCountOfPackages(boolean includeRetired) {
+		return metadataExportDao.getCountOfPackages(includeRetired);
+	}
+	
+	@Override
 	public ExportPackage retireExportPackage(ExportPackage exportPackage, String reason) {
 		return metadataExportDao.savePackage(exportPackage);
 	}
@@ -85,12 +97,20 @@ public class MetadataExportServiceImpl extends BaseOpenmrsService implements Met
 	
 	@Override
 	@Transactional(readOnly = true)
-	public List<ExportBuild> getBuilds(String packageUuid) {
-		ExportPackage exportPackage = metadataExportDao.getPackageByUuid(packageUuid);
-		if (exportPackage == null) {
-			throw new APIException("No export package with uuid " + packageUuid);
-		}
+	public List<ExportBuild> getBuilds(ExportPackage exportPackage) {
 		return metadataExportDao.getBuilds(exportPackage);
+	}
+	
+	@Override
+	@Transactional(readOnly = true)
+	public List<ExportBuild> getBuilds(ExportPackage exportPackage, int startIndex, int limit) {
+		return metadataExportDao.getBuilds(exportPackage, startIndex, limit);
+	}
+	
+	@Override
+	@Transactional(readOnly = true)
+	public long getCountOfBuilds(ExportPackage exportPackage) {
+		return metadataExportDao.getCountOfBuilds(exportPackage);
 	}
 	
 	@Override

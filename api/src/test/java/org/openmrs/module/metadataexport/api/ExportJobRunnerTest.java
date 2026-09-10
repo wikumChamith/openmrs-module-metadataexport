@@ -73,6 +73,17 @@ class ExportJobRunnerTest extends BaseModuleContextSensitiveTest {
 	}
 	
 	@Test
+	void trigger_rejectsARetiredPackage() {
+		ExportPackage exportPackage = savePackage("Shelved", Domain.LOCATIONS.name());
+		service.retireExportPackage(exportPackage, "obsolete");
+		
+		RetiredPackageException e = assertThrows(RetiredPackageException.class,
+		    () -> runner.trigger(exportPackage.getUuid()));
+		
+		assertTrue(e.getMessage().contains("obsolete"), e.getMessage());
+	}
+	
+	@Test
 	void trigger_rejectsASecondBuildWhileOneIsActive() {
 		ExportPackage exportPackage = savePackage("Busy", Domain.LOCATIONS.name());
 		ExportBuild running = queuedBuild(exportPackage);
@@ -92,7 +103,7 @@ class ExportJobRunnerTest extends BaseModuleContextSensitiveTest {
 		// no daemon token in tests, so the launch fails after the QUEUED build is saved
 		assertThrows(APIException.class, () -> runner.trigger(exportPackage.getUuid()));
 		
-		List<ExportBuild> builds = service.getBuilds(exportPackage.getUuid());
+		List<ExportBuild> builds = service.getBuilds(exportPackage);
 		assertEquals(2, builds.size());
 		ExportBuild second = builds.get(0);
 		assertEquals(2, second.getVersion());

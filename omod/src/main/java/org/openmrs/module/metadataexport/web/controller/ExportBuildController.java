@@ -9,11 +9,11 @@
  */
 package org.openmrs.module.metadataexport.web.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.metadataexport.api.MetadataExportService;
 import org.openmrs.module.metadataexport.api.model.ExportBuild;
 import org.openmrs.module.metadataexport.api.model.ExportStatus;
-import org.openmrs.module.metadataexport.web.controller.dto.ExportBuildDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -26,46 +26,69 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.util.Collections;
+import java.util.Map;
 
+/**
+ * Streams a completed build's zip. Everything else about builds is the {@code ExportBuildResource}
+ * REST resource; this stays a plain controller because the REST framework only speaks JSON/XML. Its
+ * mapping has one URI variable against the four of the framework's sub-resource pattern, so
+ * Spring's pattern comparator routes here first. Privileges are enforced by the service.
+ */
+@Slf4j
 @Controller("metadataexport.ExportBuildController")
 @RequestMapping(MetadataExportRestConstants.BASE + "/builds")
 public class ExportBuildController {
 	
-	@GetMapping("/{uuid}")
-	@ResponseBody
-	public ResponseEntity<ExportBuildDto> getBuild(@PathVariable String uuid) {
-		Context.requirePrivilege(MetadataExportRestConstants.GET_PRIVILEGE);
-		ExportBuild build = service().getBuildByUuid(uuid);
-		if (build == null) {
-			return ResponseEntity.notFound().build();
-		}
-		return ResponseEntity.ok(ExportBuildDto.detailFrom(build));
-	}
-	
 	@GetMapping("/{uuid}/download")
 	@ResponseBody
-	public ResponseEntity<?> download(@PathVariable String uuid, HttpServletResponse response) throws IOException {
-		Context.requirePrivilege(MetadataExportRestConstants.MANAGE_PRIVILEGE);
+	public ResponseEntity<Map<String, String>> download(@PathVariable String uuid, HttpServletResponse response)
+	        throws IOException {
 		ExportBuild build = service().getBuildByUuid(uuid);
 		if (build == null) {
-			return ResponseEntity.notFound().build();
+			return error(HttpStatus.NOT_FOUND, "No export build with uuid " + uuid);
 		}
 		if (build.getExportStatus() != ExportStatus.COMPLETED) {
-			return ResponseEntity.status(HttpStatus.CONFLICT)
-			        .body(Collections.singletonMap("error", "Build is " + build.getExportStatus() + ", not COMPLETED"));
+			return error(HttpStatus.CONFLICT, "Build is " + build.getExportStatus() + ", not COMPLETED");
 		}
 		File zip = service().getBuildZip(build);
-		if (zip == null || !zip.exists()) {
-			return ResponseEntity.status(HttpStatus.GONE)
-			        .body(Collections.singletonMap("error", "The zip of this build no longer exists on the server"));
+		if (zip == null) {
+			log.error("Metadata Export: build {} is COMPLETED but has no zip path recorded", build.getUuid());
+			return error(HttpStatus.INTERNAL_SERVER_ERROR,
+			    "The build record is inconsistent (no zip recorded); see the server log");
+		}
+		if (!zip.exists()) {
+			return error(HttpStatus.GONE, "The zip of this build no longer exists on the server");
 		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Length", String.valueOf(zip.length()));
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + zip.getName() + "\"");
-		Files.copy(zip.toPath(), response.getOutputStream());
-		response.flushBuffer();
+		try {
+			Files.copy(zip.toPath(), response.getOutputStream());
+			response.flushBuffer();
+		}
+		catch (NoSuchFileException e) {
+			// deleted between the exists() check and the copy
+			if (!response.isCommitted()) {
+				response.reset();
+				return error(HttpStatus.GONE, "The zip of this build no longer exists on the server");
+			}
+			throw e;
+		}
+		catch (IOException e) {
+			if (response.isCommitted()) {
+				// almost always the client going away mid-download; nothing more can be sent
+				log.info("Metadata Export: download of build {} aborted: {}", build.getUuid(), e.getMessage());
+				return null;
+			}
+			throw e;
+		}
 		return null;
+	}
+	
+	private static ResponseEntity<Map<String, String>> error(HttpStatus status, String message) {
+		return ResponseEntity.status(status).body(Collections.singletonMap("error", message));
 	}
 	
 	private static MetadataExportService service() {

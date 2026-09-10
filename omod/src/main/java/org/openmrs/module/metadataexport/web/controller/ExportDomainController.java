@@ -11,6 +11,7 @@ package org.openmrs.module.metadataexport.web.controller;
 
 import lombok.AllArgsConstructor;
 import org.openmrs.api.context.Context;
+import org.openmrs.module.metadataexport.MetadataExportConstants;
 import org.openmrs.module.metadataexport.export.DomainExporter;
 import org.openmrs.module.metadataexport.export.DomainExporterRegistry;
 import org.springframework.stereotype.Controller;
@@ -32,7 +33,7 @@ public class ExportDomainController {
 	@GetMapping
 	@ResponseBody
 	public List<String> listDomains() {
-		Context.requirePrivilege(MetadataExportRestConstants.GET_PRIVILEGE);
+		Context.requirePrivilege(MetadataExportConstants.GET_PRIVILEGE);
 		List<String> domains = new ArrayList<>();
 		for (DomainExporter<?> exporter : domainExporterRegistry.all()) {
 			domains.add(exporter.getDomain().name());

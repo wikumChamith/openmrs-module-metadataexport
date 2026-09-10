@@ -65,6 +65,7 @@
         <addresshierarchyVersion>2.17.0</addresshierarchyVersion>
 		<cohortModuleVersion>3.5.0</cohortModuleVersion>
 		<tasksVersion>1.0.0</tasksVersion>
+		<webservicesRestVersion>3.1.0</webservicesRestVersion>
     </properties>
 
 	<build>

@@ -42,7 +42,11 @@ public class ExportJobRunner {
 		if (exportPackage == null) {
 			throw new APIException("No export package with uuid " + packageUuid);
 		}
-		List<ExportBuild> builds = service.getBuilds(packageUuid);
+		if (Boolean.TRUE.equals(exportPackage.getRetired())) {
+			throw new RetiredPackageException(
+			        "Package '" + exportPackage.getName() + "' is retired: " + exportPackage.getRetireReason());
+		}
+		List<ExportBuild> builds = service.getBuilds(exportPackage);
 		for (ExportBuild existing : builds) {
 			if (!existing.getExportStatus().isTerminal()) {
 				throw new ActiveBuildException("Build v" + existing.getVersion() + " of '" + exportPackage.getName()

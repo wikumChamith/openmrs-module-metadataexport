@@ -7,21 +7,16 @@
  * Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
  * graphic logo is a trademark of OpenMRS Inc.
  */
-package org.openmrs.module.metadataexport.web.controller.dto;
+package org.openmrs.module.metadataexport.api;
 
-import lombok.Getter;
-import lombok.Setter;
+import org.openmrs.api.APIException;
 
-import java.util.List;
-
-@Getter
-@Setter
-public class ExportPackageRequest {
+/** Thrown by {@link ExportJobRunner#trigger} when the package has been retired; a 409 over REST. */
+public class RetiredPackageException extends APIException {
 	
-	private String name;
+	private static final long serialVersionUID = 1L;
 	
-	private String description;
-	
-	// null (field absent) is rejected on write; an explicit [] means every registered domain
-	private List<ExportPackageEntryDto> entries;
+	public RetiredPackageException(String message) {
+		super(message);
+	}
 }

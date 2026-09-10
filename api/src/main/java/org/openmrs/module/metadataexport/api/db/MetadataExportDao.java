@@ -24,11 +24,19 @@ public interface MetadataExportDao {
 	
 	List<ExportPackage> getAllPackages(boolean includeRetired);
 	
+	List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit);
+	
+	long getCountOfPackages(boolean includeRetired);
+	
 	ExportBuild saveBuild(ExportBuild exportBuild);
 	
 	ExportBuild getBuildByUuid(String uuid);
 	
 	List<ExportBuild> getBuilds(ExportPackage exportPackage);
+	
+	List<ExportBuild> getBuilds(ExportPackage exportPackage, int startIndex, int limit);
+	
+	long getCountOfBuilds(ExportPackage exportPackage);
 	
 	ExportBuild getLatestBuild(ExportPackage exportPackage);
 	

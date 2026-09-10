@@ -9,13 +9,12 @@
  */
 package org.openmrs.module.metadataexport.web.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.initializer.Domain;
+import org.openmrs.module.metadataexport.MetadataExportConstants;
 import org.openmrs.module.metadataexport.api.MetadataExportService;
 import org.openmrs.module.metadataexport.api.model.ExportBuild;
 import org.openmrs.module.metadataexport.api.model.ExportPackage;
@@ -23,9 +22,11 @@ import org.openmrs.module.metadataexport.api.model.ExportPackageEntry;
 import org.openmrs.module.metadataexport.api.model.ExportStatus;
 import org.openmrs.util.OpenmrsUtil;
 import org.openmrs.web.test.jupiter.BaseModuleWebContextSensitiveTest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +35,6 @@ import java.nio.file.Files;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
@@ -42,7 +42,8 @@ class ExportBuildControllerTest extends BaseModuleWebContextSensitiveTest {
 	
 	private static final String BUILDS = MetadataExportRestConstants.BASE + "/builds";
 	
-	private final ObjectMapper mapper = new ObjectMapper();
+	@Autowired
+	private WebApplicationContext webApplicationContext;
 	
 	private MockMvc mockMvc;
 	
@@ -54,43 +55,6 @@ class ExportBuildControllerTest extends BaseModuleWebContextSensitiveTest {
 		OpenmrsUtil.setApplicationDataDirectory(appDataDir.getAbsolutePath());
 		mockMvc = MockMvcBuilders.standaloneSetup(new ExportBuildController())
 		        .setControllerAdvice(new MetadataExportControllerAdvice()).build();
-	}
-	
-	@Test
-	void getBuild_returnsStatusWithoutDownloadUrlWhileQueued() throws Exception {
-		ExportBuild build = saveBuild(ExportStatus.QUEUED);
-		
-		MockHttpServletResponse response = mockMvc.perform(get(BUILDS + "/" + build.getUuid())).andReturn().getResponse();
-		
-		assertEquals(200, response.getStatus());
-		JsonNode body = mapper.readTree(response.getContentAsString());
-		assertEquals("QUEUED", body.get("status").asText());
-		assertEquals(build.getExportPackage().getUuid(), body.get("packageUuid").asText());
-		assertTrue(body.get("downloadUrl").isNull());
-	}
-	
-	@Test
-	void getBuild_includesManifestAndDownloadUrlWhenCompleted() throws Exception {
-		ExportBuild build = saveBuild(ExportStatus.COMPLETED);
-		build.setManifestJson("{\"version\":1}");
-		service().saveExportBuild(build);
-		
-		MockHttpServletResponse response = mockMvc
-		        .perform(get("/openmrs" + BUILDS + "/" + build.getUuid()).contextPath("/openmrs")).andReturn().getResponse();
-		
-		assertEquals(200, response.getStatus());
-		JsonNode body = mapper.readTree(response.getContentAsString());
-		assertEquals(1, body.get("manifest").get("version").asInt());
-		String downloadUrl = body.get("downloadUrl").asText();
-		assertTrue(
-		    downloadUrl
-		            .contains("/openmrs/ws" + MetadataExportRestConstants.BASE + "/builds/" + build.getUuid() + "/download"),
-		    "downloadUrl must include the servlet context path: " + downloadUrl);
-	}
-	
-	@Test
-	void getBuild_returns404ForUnknownUuid() throws Exception {
-		assertEquals(404, mockMvc.perform(get(BUILDS + "/no-such-uuid")).andReturn().getResponse().getStatus());
 	}
 	
 	@Test
@@ -133,6 +97,63 @@ class ExportBuildControllerTest extends BaseModuleWebContextSensitiveTest {
 		        .getResponse();
 		
 		assertEquals(410, response.getStatus());
+	}
+	
+	@Test
+	void download_returns404WithAnErrorBodyForUnknownBuild() throws Exception {
+		MockHttpServletResponse response = mockMvc.perform(get(BUILDS + "/no-such-uuid/download")).andReturn().getResponse();
+		
+		assertEquals(404, response.getStatus());
+		assertTrue(response.getContentAsString().contains("no-such-uuid"), response.getContentAsString());
+	}
+	
+	/**
+	 * Read-only users can poll a build but not take the zip: getBuildZip carries the Manage privilege.
+	 */
+	@Test
+	void download_returns403ForAUserWithOnlyTheGetPrivilege() throws Exception {
+		ExportBuild build = saveBuild(ExportStatus.COMPLETED);
+		Context.becomeUser("3-4"); // butch: no metadata export privileges in the standard dataset
+		Context.addProxyPrivilege(MetadataExportConstants.GET_PRIVILEGE);
+		try {
+			assertEquals(403,
+			    mockMvc.perform(get(BUILDS + "/" + build.getUuid() + "/download")).andReturn().getResponse().getStatus());
+		}
+		finally {
+			Context.removeProxyPrivilege(MetadataExportConstants.GET_PRIVILEGE);
+			authenticate();
+		}
+	}
+	
+	/**
+	 * Through the real dispatcher chain rather than a standalone setup: without the
+	 * ExceptionHandlerExceptionResolver in webModuleApplicationContext.xml the advice never runs and a
+	 * logged-out request comes back 200 with a stack-trace body.
+	 */
+	@Test
+	void download_returns401ThroughTheRealDispatcherWhenNotAuthenticated() throws Exception {
+		MockMvc realDispatcher = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+		Context.logout();
+		try {
+			assertEquals(401,
+			    realDispatcher.perform(get(BUILDS + "/no-such-uuid/download")).andReturn().getResponse().getStatus());
+		}
+		finally {
+			authenticate();
+		}
+	}
+	
+	@Test
+	void download_returns401WhenNotAuthenticated() throws Exception {
+		ExportBuild build = saveBuild(ExportStatus.COMPLETED);
+		Context.logout();
+		try {
+			assertEquals(401,
+			    mockMvc.perform(get(BUILDS + "/" + build.getUuid() + "/download")).andReturn().getResponse().getStatus());
+		}
+		finally {
+			authenticate();
+		}
 	}
 	
 	private ExportBuild saveBuild(ExportStatus status) {

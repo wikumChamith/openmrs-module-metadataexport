@@ -11,67 +11,33 @@ package org.openmrs.module.metadataexport.web.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import org.openmrs.api.APIAuthenticationException;
-import org.openmrs.api.APIException;
-import org.openmrs.api.ValidationException;
 import org.openmrs.api.context.Context;
 import org.openmrs.api.context.ContextAuthenticationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
-import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * Extends {@link ResponseEntityExceptionHandler} so Spring's request-shape exceptions (malformed
- * JSON, unsupported content type, ...) keep their standard 4xx statuses instead of falling into the
- * Exception catch-all below.
+ * Error handling for the two plain Spring controllers only (the zip download and the domain list),
+ * scoped by type so it never touches {@code MetadataExportRestController}, whose REST-module base
+ * class carries its own handlers. Authentication failures become 401/403; anything else these
+ * controllers can throw is a server fault, so it is a logged 500. Extends
+ * {@link ResponseEntityExceptionHandler} so Spring's request-shape exceptions keep their standard
+ * 4xx statuses instead of falling into the Exception catch-all below.
  */
 @Slf4j
-@RestControllerAdvice(basePackages = "org.openmrs.module.metadataexport.web.controller")
+@RestControllerAdvice(assignableTypes = { ExportBuildController.class, ExportDomainController.class })
 public class MetadataExportControllerAdvice extends ResponseEntityExceptionHandler {
 	
-	@ExceptionHandler(ValidationException.class)
-	public ResponseEntity<Map<String, Object>> handleValidation(ValidationException e) {
-		Map<String, Object> body = new LinkedHashMap<>();
-		body.put("error", "Validation failed");
-		Map<String, String> fieldErrors = new LinkedHashMap<>();
-		List<String> globalErrors = new ArrayList<>();
-		if (e.getErrors() != null) {
-			for (FieldError fieldError : e.getErrors().getFieldErrors()) {
-				fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
-			}
-			for (ObjectError globalError : e.getErrors().getGlobalErrors()) {
-				globalErrors.add(globalError.getDefaultMessage());
-			}
-		}
-		body.put("fieldErrors", fieldErrors);
-		body.put("globalErrors", globalErrors);
-		return ResponseEntity.badRequest().body(body);
-	}
-	
 	@ExceptionHandler({ APIAuthenticationException.class, ContextAuthenticationException.class })
-	public ResponseEntity<Map<String, String>> handleAuthentication(APIException e) {
+	public ResponseEntity<Map<String, String>> handleAuthentication(RuntimeException e) {
 		HttpStatus status = Context.isAuthenticated() ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED;
 		return ResponseEntity.status(status).body(Collections.singletonMap("error", e.getMessage()));
-	}
-	
-	@ExceptionHandler(IllegalArgumentException.class)
-	public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
-		return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
-	}
-	
-	@ExceptionHandler(APIException.class)
-	public ResponseEntity<Map<String, String>> handleApiException(APIException e) {
-		log.warn("Metadata Export: service exception handling a REST request", e);
-		return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
 	}
 	
 	@ExceptionHandler(Exception.class)

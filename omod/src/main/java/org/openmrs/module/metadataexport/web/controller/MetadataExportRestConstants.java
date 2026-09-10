@@ -9,13 +9,16 @@
  */
 package org.openmrs.module.metadataexport.web.controller;
 
+import org.openmrs.module.webservices.rest.web.RestConstants;
+
 public final class MetadataExportRestConstants {
 	
-	public static final String BASE = "/rest/v1/metadataexport";
+	public static final String NAMESPACE = RestConstants.VERSION_1 + "/metadataexport";
 	
-	public static final String GET_PRIVILEGE = "Get Metadata Export Packages";
+	public static final String BASE = "/rest/" + NAMESPACE;
 	
-	public static final String MANAGE_PRIVILEGE = "Manage Metadata Export Packages";
+	/** REST module version-range syntax; the open upper bound follows core's own resources. */
+	public static final String SUPPORTED_OPENMRS_VERSIONS = "2.8.* - 9.*";
 	
 	private MetadataExportRestConstants() {
 	}
