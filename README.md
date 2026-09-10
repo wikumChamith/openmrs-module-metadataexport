@@ -116,6 +116,15 @@ Currently supported domains:
   server or the row fails to import (core's own `provider_role` table is not consulted); a task
   whose assignee role no longer exists on the exporting server is exported without the assignee
   column, with a warning; requires the tasks module (1.0+)
+* Queues (name, description, service, status concept set, priority concept set, location) — the
+  referenced concepts and location are pulled in via cross-domain closure, and so are the
+  `queue.serviceConceptSetName` global property and the concept set it names, because the queue
+  module validates every imported queue against them (the importing server rejects each row until
+  the property is set and the service concept is a member of that set); retired queues are not
+  exported, with a warning per skipped queue (Initializer bootstraps a row through the queue
+  module's lookup by uuid, which excludes retired queues, so a retired row can never be matched on
+  the target: where it already exists the re-import fails on the uuid constraint and Initializer
+  2.12 then abandons the rest of the file); requires the queue module (3.0+)
 
 Domains contributed by other modules (supportable, but depend on the module being present;
 not yet covered):
@@ -123,7 +132,6 @@ not yet covered):
 * Forms (Bahmni forms, AMPATH forms, AMPATH form translations, HTML forms)
 * Billing / cashier (billable services, payment modes, cash points, cashier item prices)
 * Appointment scheduling (specialities, service definitions, service types)
-* Queues
 * Data filter mappings
 
 Non-exportable Initializer domains (Liquibase, JSON key-values, OCL, Dispositions) are
