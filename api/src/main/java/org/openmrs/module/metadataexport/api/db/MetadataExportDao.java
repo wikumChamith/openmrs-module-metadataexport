@@ -22,8 +22,6 @@ public interface MetadataExportDao {
 	
 	ExportPackage getPackageByName(String name);
 	
-	List<ExportPackage> getAllPackages(boolean includeRetired);
-	
 	List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit);
 	
 	long getCountOfPackages(boolean includeRetired);

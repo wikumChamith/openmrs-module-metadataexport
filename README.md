@@ -207,8 +207,12 @@ curl -u admin:pw -OJ $BASE/builds/<build-uuid>/download
 Privileges are enforced on the service (`@Authorized`), so they apply to every entry point that
 reaches it; `/domains` reads the exporter registry directly and checks the Get privilege itself.
 Reads need `Get Metadata Export Packages`; creating, updating, retiring, triggering and downloading
-need `Manage Metadata Export Packages`. Note the REST module's own convention that list and search
-responses are `ref` representations unless the request carries `?v=default` or `?v=full`.
+need `Manage Metadata Export Packages`. A role that manages packages must also hold the Get
+privilege: every write renders the saved object in its response, and that rendering reads (for
+example `latestBuild`), so a Manage-only role would have its `POST /packages` succeed and then get
+back a privilege error instead of the created package. Note the REST module's own convention that
+list and search responses are `ref` representations unless the request carries `?v=default` or
+`?v=full`.
 
 If the server restarts mid-build, the activator marks any stranded QUEUED/RUNNING builds as
 FAILED on startup so they never block future builds of their package.

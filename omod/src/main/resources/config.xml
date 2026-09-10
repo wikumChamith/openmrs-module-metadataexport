@@ -61,7 +61,7 @@
 	</privilege>
 	<privilege>
 		<name>Manage Metadata Export Packages</name>
-		<description>Able to create, update and retire metadata export packages, trigger builds and download exports</description>
+		<description>Able to create, update and retire metadata export packages, trigger builds and download exports. Grant together with Get Metadata Export Packages: write responses render the saved object, which needs the read privilege</description>
 	</privilege>
 
 

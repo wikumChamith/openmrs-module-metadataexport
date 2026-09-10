@@ -35,9 +35,6 @@ public interface MetadataExportService extends OpenmrsService {
 	ExportPackage getPackageByUuid(String uuid);
 	
 	@Authorized(MetadataExportConstants.GET_PRIVILEGE)
-	List<ExportPackage> getAllPackages(boolean includeRetired);
-	
-	@Authorized(MetadataExportConstants.GET_PRIVILEGE)
 	List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit);
 	
 	@Authorized(MetadataExportConstants.GET_PRIVILEGE)

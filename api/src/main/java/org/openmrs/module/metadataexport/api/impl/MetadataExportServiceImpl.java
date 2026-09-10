@@ -63,12 +63,6 @@ public class MetadataExportServiceImpl extends BaseOpenmrsService implements Met
 	
 	@Override
 	@Transactional(readOnly = true)
-	public List<ExportPackage> getAllPackages(boolean includeRetired) {
-		return metadataExportDao.getAllPackages(includeRetired);
-	}
-	
-	@Override
-	@Transactional(readOnly = true)
 	public List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit) {
 		return metadataExportDao.getPackages(includeRetired, startIndex, limit);
 	}

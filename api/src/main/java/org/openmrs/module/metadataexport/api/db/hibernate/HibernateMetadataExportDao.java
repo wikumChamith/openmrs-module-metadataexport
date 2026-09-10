@@ -52,11 +52,6 @@ public class HibernateMetadataExportDao implements MetadataExportDao {
 	}
 	
 	@Override
-	public List<ExportPackage> getAllPackages(boolean includeRetired) {
-		return packagesQuery(includeRetired).getResultList();
-	}
-	
-	@Override
 	public List<ExportPackage> getPackages(boolean includeRetired, int startIndex, int limit) {
 		return window(packagesQuery(includeRetired), startIndex, limit).getResultList();
 	}
