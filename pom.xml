@@ -67,7 +67,8 @@
 		<tasksVersion>1.0.0</tasksVersion>
 		<queueVersion>3.0.0</queueVersion>
 		<webservicesRestVersion>3.1.0</webservicesRestVersion>
-    </properties>
+		<appointmentsVersion>1.2.1</appointmentsVersion>
+	</properties>
 
 	<build>
 		<plugins>
@@ -222,6 +223,12 @@
 			<artifactId>initializer-api-2.3</artifactId>
 			<version>${initializerVersion}</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.bahmni.module</groupId>
+			<artifactId>appointments-api</artifactId>
+			<version>${appointmentsVersion}</version>
+			<scope>provided</scope>
 		</dependency>
 	</dependencies>
 </project>
