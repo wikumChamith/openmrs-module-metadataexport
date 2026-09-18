@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    This Source Code Form is subject to the terms of the Mozilla Public License,
+    v. 2.0. If a copy of the MPL was not distributed with this file, You can
+    obtain one at http://mozilla.org/MPL/2.0/. OpenMRS is also distributed under
+    the terms of the Healthcare Disclaimer located at http://openmrs.org/license.
+
+    Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
+    graphic logo is a trademark of OpenMRS Inc.
+
+-->
+<!--
+  Hibernate mappings of optional modules that map their entities with hbm.xml files instead of
+  annotations. Core's session factory only scans org.openmrs for annotated classes, so without this
+  the in-memory test schema has no tables for them. Loaded as an extra config location by the
+  sessionFactory override in TestingApplicationContext.xml.
+-->
+<hibernate-configuration>
+	<session-factory>
+		<!-- Bahmni appointments (hbm files sit at the root of appointments-api.jar) -->
+		<mapping resource="Speciality.hbm.xml"/>
+		<mapping resource="AppointmentServiceDefinition.hbm.xml"/>
+		<mapping resource="AppointmentServiceType.hbm.xml"/>
+		<mapping resource="ServiceWeeklyAvailability.hbm.xml"/>
+		<mapping resource="Appointment.hbm.xml"/>
+		<mapping resource="AppointmentProvider.hbm.xml"/>
+		<mapping resource="AppointmentAudit.hbm.xml"/>
+		<mapping resource="AppointmentRecurringPattern.hbm.xml"/>
+	</session-factory>
+</hibernate-configuration>

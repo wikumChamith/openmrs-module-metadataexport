@@ -25,4 +25,23 @@
 	<bean id="metadataExportStubAttributeTypeCsvLineHandler"
 	      class="org.openmrs.module.metadataexport.StubAttributeTypeCsvLineHandler"/>
 
+	<!--
+	  Same definition as core's applicationContext-service.xml plus test-hibernate.cfg.xml, which
+	  maps the hbm.xml-based entities of optional modules (Bahmni appointments) into the test schema.
+	-->
+	<bean id="sessionFactory" class="org.openmrs.api.db.hibernate.HibernateSessionFactoryBean">
+		<property name="configLocations">
+			<list>
+				<value>classpath:hibernate.cfg.xml</value>
+				<value>classpath:test-hibernate.cfg.xml</value>
+			</list>
+		</property>
+		<property name="mappingJarLocations" ref="mappingJarResources"/>
+		<property name="packagesToScan">
+			<list>
+				<value>org.openmrs</value>
+			</list>
+		</property>
+	</bean>
+
 </beans>
