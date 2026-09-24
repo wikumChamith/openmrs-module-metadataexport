@@ -1,4 +1,4 @@
-name: Build on Windows
+name: Build on Windows 
 
 # Manual check that the module builds and its tests pass on Windows. The shared OpenMRS build
 # workflow only runs on Linux. Point `ref` at a branch, tag, or pull request head such as
