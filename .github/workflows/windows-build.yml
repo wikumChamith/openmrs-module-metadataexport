@@ -1,0 +1,47 @@
+name: Build on Windows
+
+# Manual check that the module builds and its tests pass on Windows. The shared OpenMRS build
+# workflow only runs on Linux. Point `ref` at a branch, tag, or pull request head such as
+# `refs/pull/45/head` to test a PR without merging it. To build a branch of another repository,
+# such as a PR author's fork, set `repository` to `owner/name`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Repository to build (owner/name); defaults to this one'
+        type: string
+        default: ''
+      ref:
+        description: 'Git ref to build (branch, tag, or refs/pull/<n>/head)'
+        type: string
+        default: 'main'
+      java_version:
+        description: 'Java version'
+        type: string
+        default: '8'
+      maven_args:
+        description: 'Maven arguments'
+        type: string
+        default: 'clean install'
+
+jobs:
+  build:
+    name: Windows / Java ${{ inputs.java_version }}
+    runs-on: windows-latest
+    steps:
+      - name: Checkout ${{ inputs.repository || github.repository }}@${{ inputs.ref }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version }}
+          cache: maven
+
+      - name: Build
+        run: mvn -B ${{ inputs.maven_args }}
